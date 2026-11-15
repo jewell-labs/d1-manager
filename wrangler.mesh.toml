@@ -1,0 +1,56 @@
+# Mesh deploy config. The hostname is a record on the jewell-labs.com zone.
+# R2 is not bound until that product is enabled on the account. Backups stay off.
+name = "d1-manager"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+[build]
+command = "pnpm run build"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "METADATA"
+database_name = "d1-manager"
+database_id = "b37c561e-6914-4fbf-bf95-427b78eac51d"
+
+[[durable_objects.bindings]]
+name = "BACKUP_DO"
+class_name = "BackupDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["BackupDO"]
+
+[[routes]]
+pattern = "d1-manager.jewell-labs.com"
+custom_domain = true
+zone_name = "jewell-labs.com"
+
+[env.staging]
+name = "d1-manager-staging"
+workers_dev = false
+
+[[env.staging.d1_databases]]
+binding = "METADATA"
+database_name = "d1-manager-staging"
+database_id = "3e430083-3c79-49ff-b226-855609813d79"
+
+[[env.staging.routes]]
+pattern = "staging.d1-manager.jewell-labs.com"
+custom_domain = true
+zone_name = "jewell-labs.com"
+
+[[env.staging.durable_objects.bindings]]
+name = "BACKUP_DO"
+class_name = "BackupDO"
+
+[observability.logs]
+enabled = true

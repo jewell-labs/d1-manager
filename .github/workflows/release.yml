@@ -1,0 +1,54 @@
+# Production deploy. workflow_dispatch only. confirm=promote-staging deploys main.
+# The mesh tool promote is what starts this workflow.
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: promote-staging deploys main to production
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - name: Require the promote confirmation
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "promote-staging" ]; then
+            echo "::error::confirm must be promote-staging"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Deploy production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
+          TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
+          POLICY_AUD: ${{ secrets.POLICY_AUD }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ACCOUNT_ID" | pnpm exec wrangler secret put ACCOUNT_ID --config wrangler.mesh.toml
+          printf '%s' "$API_KEY" | pnpm exec wrangler secret put API_KEY --config wrangler.mesh.toml
+          printf '%s' "$TEAM_DOMAIN" | pnpm exec wrangler secret put TEAM_DOMAIN --config wrangler.mesh.toml
+          printf '%s' "$POLICY_AUD" | pnpm exec wrangler secret put POLICY_AUD --config wrangler.mesh.toml
+          pnpm exec wrangler deploy --config wrangler.mesh.toml
